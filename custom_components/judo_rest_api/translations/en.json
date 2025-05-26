@@ -49,6 +49,9 @@
             },
             "salt_warning": {
                 "name": "Salt warning"
+            },
+            "salt_storage_mass": {
+                "name": "Salt storage mass total"
             }
         },
         "button": {
@@ -63,14 +66,17 @@
             }
         },
         "select": {
-            "hz_operationmode": {
-                "name": "{prefix}Betriebsart",
+            "salt_refill_mass": {
+                "name": "Salt refill",
                 "state": {
-                    "hz_operationmode_lowering": "Absenkbetrieb",
-                    "hz_operationmode_automatic": "Automatik",
-                    "hz_operationmode_normal": "Normal",
-                    "hz_operationmode_standby": "Standby",
-                    "hz_operationmode_comfort": "Komfort"
+                    "mass_0kg": "0 kg",
+                    "mass_1kg": "1 kg",
+                    "mass_5kg": "5 kg",
+                    "mass_10kg": "10 kg",
+                    "mass_15kg": "15 kg",
+                    "mass_20kg": "20 kg",
+                    "mass_25kg": "25 kg",
+                    "mass_50kg": "50 kg"
                 }
             }
         },

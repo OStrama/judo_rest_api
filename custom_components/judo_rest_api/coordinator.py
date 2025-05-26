@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .configentry import MyConfigEntry
-from .const import CONF, FORMATS
+from .const import CONF, FORMATS, TYPES
 from .items import RestItem
 from .restobject import RestAPI, RestObject
 
@@ -51,7 +51,7 @@ class MyCoordinator(DataUpdateCoordinator):
     async def get_value(self, rest_item: RestItem):
         """Read a value from the rest API"""
 
-        if rest_item.format is FORMATS.BUTTON:
+        if rest_item.type in (TYPES.SELECT_NOIF, TYPES.BUTTON):
             return None
         ro = RestObject(self._rest_api, rest_item)
         if ro is None:

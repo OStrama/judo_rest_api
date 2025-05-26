@@ -102,6 +102,7 @@ class RestAPI:
 
     async def set_rest(self, command: str, towrite: str):
         """write raw response to REST api"""
+        log.warning("set_rest:>%s<>%s<", str(command), str(towrite))
         if command is None:
             return None
         if towrite is None:
@@ -240,10 +241,9 @@ class RestObject:
 
     # @value.setter
     async def setvalue(self, value=None) -> None:
-        """Set the value of the rest register, does nothing when not R/W.
-
-        :param val: The value to write to the rest
-        :type val: any"""
+        """Set the value of the rest register, does nothing when not R/W."""
+        """:param val: The value to write to the rest"""
+        """:type val: any"""
         towrite = None
         if self._rest_api is None:
             return
@@ -264,12 +264,88 @@ class RestObject:
                     await self._rest_api.set_rest(self._rest_item.address_write, "")
                 return
             case FORMATS.NUMBER:
-                towrite = self.format_int_message(int(int(value) * self._divider), True)
+                towrite = self.format_int_message(
+                    int(float(value) * self._divider), True
+                )
             case FORMATS.TEXT:
                 towrite = self.format_str_message((value), True)
             case FORMATS.STATUS:
                 towrite = self.format_int_message(
-                    self._rest_item.get_number_from_translation_key(value), True
+                    (self._rest_item.get_number_from_translation_key(value))
+                    * self._divider,
+                    True,
+                )
+            case _:
+                log.warning(
+                    "Unknown format: %s in %s",
+                    str(self._rest_item.type),
+                    str(self._rest_item.translation_key),
+                )
+                return
+        if towrite is not None:
+            await self._rest_api.set_rest(self._rest_item.address_write, towrite)
+        return
+
+    async def addvalue(self, value=None) -> None:
+        """Set the value of the rest register, does nothing when not R/W."""
+        """:param val: The value to write to the rest"""
+        """:type val: any"""
+        towrite = None
+        if self._rest_api is None:
+            return None
+
+        if self._rest_item.type == TYPES.SENSOR:
+            return None
+        if self._rest_item.format is FORMATS.BUTTON:
+            return None
+        if value is None:
+            return None
+
+        res = await self._rest_api.get_rest(self._rest_item.address_read)
+
+        if res is None:
+            return None
+
+        index = self._rest_item.read_index * 2
+        big_endian = res[index : index + self._rest_item.read_bytes * 2]
+        little_endian = bytes.fromhex(big_endian)[::-1].hex()
+        big_endian = bytes.fromhex(big_endian)[::1].hex()
+
+        if big_endian is None:
+            return None
+        if little_endian is None:
+            return None
+        if big_endian == "":
+            return None
+        if little_endian == "":
+            return None
+        offset = float(int(little_endian, 16) / self._divider)
+
+        #        self._rest_item.state = value + offset
+        match self._rest_item.format:
+            case FORMATS.NUMBER:
+                self._rest_item.state = value + offset
+                towrite = self.format_int_message(
+                    int((float(value) + float(offset)) * self._divider), True
+                )
+            case FORMATS.TEXT:
+                self._rest_item.state = value + offset
+                towrite = self.format_str_message((value + offset), True)
+            case FORMATS.STATUS:
+                self._rest_item.state = (
+                    self._rest_item.get_number_from_translation_key(value) + offset
+                )
+                towrite = self.format_int_message(
+                    int(
+                        (
+                            float(
+                                self._rest_item.get_number_from_translation_key(value)
+                            )
+                            + float(offset)
+                        )
+                        * self._divider
+                    ),
+                    True,
                 )
             case _:
                 log.warning(

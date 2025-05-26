@@ -168,7 +168,14 @@ PARAMS_INFO: dict = {
 }
 
 PARAMS_MASS_REFILL: dict = {
-    "icon": "mdi:weight-kilogram"
+    "icon": "mdi:weight-kilogram",
+    "min": 0,
+    "max": 50,
+    "step": 0.05,
+    "divider": 1000,
+    "preciosion": 3,
+    "unit": UnitOfMass.KILOGRAMS,
+    "stateclass": SensorStateClass.MEASUREMENT
 }
 # pylint: disable=line-too-long
 
@@ -181,8 +188,11 @@ REST_SYS_ITEMS: list[RestItem] = [
     RestItem( address_read="5100", read_bytes = 2, read_index=0, address_write="3000", write_bytes = 1, write_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.NUMBER, device=DEVICES.SYS, params= PARAMS_GDH,translation_key="water_hardeness"),
     RestItem( address_read="5700", read_bytes = 1, read_index=0, address_write="5700", write_bytes = 1, write_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.NUMBER, device=DEVICES.SYS, params= PARAMS_DAYS,translation_key="salt_warning"),
 
-    RestItem( address_read="5600", read_bytes = 2, read_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params= PARAMS_MASS, translation_key="salt_storage_mass"),
+#   RestItem( address_read="5600", read_bytes = 2, read_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params= PARAMS_MASS, translation_key="salt_storage_mass"),
+    RestItem( address_read="5600", read_bytes = 2, read_index=0, address_write="5600", write_bytes = 2, write_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.NUMBER, device=DEVICES.SYS, params= PARAMS_MASS_REFILL, translation_key="salt_storage_mass"),
+
     RestItem( address_read="5600", read_bytes = 2, read_index=2, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params= PARAMS_DAYS,translation_key="salt_storage_days"),
+
     RestItem( address_read="2800", read_bytes = 4, read_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params= PARAMS_QBM_H, translation_key="water_total"),
     RestItem( address_read="2900", read_bytes = 4, read_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params= PARAMS_QBM_W, translation_key="water_treated"),
     RestItem( address_read="5800", read_bytes = 16, read_index=0, mformat=FORMATS.TEXT, mtype=TYPES.SENSOR, device=DEVICES.SYS, params= PARAMS_CONTACT,translation_key="service_contact"),
@@ -195,7 +205,7 @@ REST_SYS_ITEMS: list[RestItem] = [
     RestItem(address_write="3D00", write_bytes = 0, write_index=0, mformat=FORMATS.BUTTON, mtype=TYPES.BUTTON, device=DEVICES.SYS, params= PARAMS_OPEN, translation_key="leakage_protection_open"),
     RestItem(address_write="350000", write_bytes = 0, write_index=0, mformat=FORMATS.BUTTON, mtype=TYPES.BUTTON, device=DEVICES.SYS, params= PARAMS_REG, translation_key="start_regeneration"),
 
-    # RestItem(mformat=FORMATS.STATUS, mtype=TYPES.SELECT_NOIF, device=DEVICES.SYS, params= PARAMS_MASS_REFILL, resultlist=SALT_MASS, translation_key="salt_refill_mass"),
+#    RestItem(address_read="5600", read_bytes = 2, read_index=0,address_write="5600", write_bytes = 2, write_index=0, mformat=FORMATS.STATUS, mtype=TYPES.SELECT_NOIF, device=DEVICES.SYS, params= PARAMS_MASS_REFILL, resultlist=SALT_MASS, translation_key="salt_refill_mass"),
 ]
 
 REST_ST_ITEMS: list[RestItem] = [

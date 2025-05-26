@@ -1,4 +1,4 @@
-"""Entity classes used in this integration"""
+"""Entity classes used in this integration."""
 
 import logging
 
@@ -13,7 +13,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .configentry import MyConfigEntry
-from .const import CONF, CONST, FORMATS
+from .const import CONF, CONST, FORMATS, TYPES
 from .coordinator import MyCoordinator
 from .items import RestItem
 from .restobject import RestAPI, RestObject
@@ -297,12 +297,23 @@ class MySelectEntity(CoordinatorEntity, SelectEntity, MyEntity):  # pylint: disa
         self.options = []
         for _useless, item in enumerate(self._rest_item.resultlist):
             self.options.append(item.translation_key)
-        self._attr_current_option = "FEHLER"
+
+        if self._rest_item.type == TYPES.SELECT_NOIF:
+            self._rest_item.state = self.options[0]
+            self._attr_current_option = self._rest_item.state
+        else:
+            self._attr_current_option = "FEHLER"
 
     async def async_select_option(self, option: str) -> None:
         """Write the selected option to modbus and refresh HA."""
-        self._rest_item.state = option
-        self._attr_current_option = self._rest_item.state
+        ro = RestObject(self._rest_api, self._rest_item)
+        await ro.addvalue(option)  # rest_item.state will be set inside ro.setvalue
+        if self._rest_item.type == TYPES.SELECT_NOIF:
+            self._rest_item.state = self.options[0]
+            self._attr_current_option = self._rest_item.state
+        else:
+            self._rest_item.state = option
+            self._attr_current_option = self._rest_item.state
         self.async_write_ha_state()
 
     @callback
