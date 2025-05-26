@@ -102,7 +102,6 @@ class RestAPI:
 
     async def set_rest(self, command: str, towrite: str):
         """write raw response to REST api"""
-        log.warning("set_rest:>%s<>%s<", str(command), str(towrite))
         if command is None:
             return None
         if towrite is None:
