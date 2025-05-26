@@ -1,3 +1,6 @@
+# Version 1.0.3
+Added control for changing salt mass. The control shows the current salt mass. When refilling, the mass that was refilled has to be added to the shown mass.
+
 # judo_rest_api
 Home Assistant integration to connect to judo water treatment directly via REST API based on this documentation:
 https://judo.eu/app/uploads/2024/11/API-KOMMANDOZEILEN.pdf
