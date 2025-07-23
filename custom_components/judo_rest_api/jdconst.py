@@ -13,7 +13,7 @@ from .items import RestItem, StatusItem
 
 reverse_device_list: dict[str, str] = {
     "dev_system": "SYS",
-    "dev_statistik": "ST",
+#    "dev_statistik": "ST",
 }
 
 ################################################################################
@@ -208,13 +208,13 @@ REST_SYS_ITEMS: list[RestItem] = [
 #    RestItem(address_read="5600", read_bytes = 2, read_index=0,address_write="5600", write_bytes = 2, write_index=0, mformat=FORMATS.STATUS, mtype=TYPES.SELECT_NOIF, device=DEVICES.SYS, params= PARAMS_MASS_REFILL, resultlist=SALT_MASS, translation_key="salt_refill_mass"),
 ]
 
-REST_ST_ITEMS: list[RestItem] = [
-    RestItem( address_read="FB00", mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.ST, params=PARAMS_QBM_H, translation_key="day_statistics"),
-]
+#REST_ST_ITEMS: list[RestItem] = [
+    #RestItem( address_read="FB00", mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.ST, params=PARAMS_QBM_H, translation_key="day_statistics"),
+#]
 
 DEVICELISTS: list = [
     REST_SYS_ITEMS,
-    REST_ST_ITEMS,
+    #REST_ST_ITEMS,
 ]
 
 # fmt: on
