@@ -130,7 +130,7 @@ class RestAPI:
             return None
         if res in DEVICETYPES:
             self._devicetype = res
-            log.info("Connected to %s", self._devicetype)
+            log.info("Connected to %s %s", self._devicetype, DEVICETYPES[self._devicetype])
             return True
 
         log.warning("Unknown Device detected, ID=%s", res)
