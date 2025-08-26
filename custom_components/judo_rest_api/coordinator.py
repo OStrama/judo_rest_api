@@ -5,10 +5,11 @@ import logging
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.translation import async_get_translations
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .configentry import MyConfigEntry
-from .const import CONF, FORMATS, TYPES
+from .const import CONF, CONST, TYPES
 from .items import RestItem
 from .restobject import RestAPI, RestObject
 
@@ -30,10 +31,7 @@ class MyCoordinator(DataUpdateCoordinator):
         super().__init__(
             hass,
             log,
-            # Name of the data. For logging purposes.
             name="judo_rest_api-coordinator",
-            # Polling interval. Will only be polled if there are subscribers.
-            # update_interval=CONST.SCAN_INTERVAL,
             update_interval=timedelta(
                 seconds=int(p_config_entry.data[CONF.SCAN_INTERVAL])
             ),
@@ -47,6 +45,7 @@ class MyCoordinator(DataUpdateCoordinator):
         self._restitems = api_items
         self._number_of_items = len(api_items)
         self._config_entry = p_config_entry
+        self._cached_device_info = {}
 
     async def get_value(self, rest_item: RestItem):
         """Read a value from the rest API"""
@@ -68,12 +67,34 @@ class MyCoordinator(DataUpdateCoordinator):
                 log.warning("None value for Item %s ignored", rest_item.translation_key)
         return rest_item.state
 
-    def get_value_from_item(self, translation_key: str) -> int:
+    def get_value_from_item(self, translation_key: str):
         """Read a value from another rest item"""
-        for _useless, item in enumerate(self._restitems):
+        for item in self._restitems:
             if item.translation_key == translation_key:
                 return item.state
         return None
+
+    async def _cache_device_info(self):
+        """Cache device info with translations."""
+        model = None
+        for item in self._restitems:
+            if item.translation_key == "device_type" and item.state:
+                translations = await async_get_translations(
+                    self.hass, self.hass.config.language, "entity", {CONST.DOMAIN}
+                )
+                translation_key = f"component.{CONST.DOMAIN}.entity.sensor.device_type.state.{item.state}"
+                model = translations.get(translation_key, item.state)
+                break
+
+        self._cached_device_info = {
+            "sw_version": self.get_value_from_item("software_version"),
+            "model": model,
+            "serial_number": self.get_value_from_item("device_number"),
+        }
+
+    def get_device_info_values(self) -> dict:
+        """Get cached device info values."""
+        return self._cached_device_info
 
     async def _async_setup(self):
         """Set up the coordinator.
@@ -86,6 +107,7 @@ class MyCoordinator(DataUpdateCoordinator):
         """
         # await self._rest_api.login()
         await self._rest_api.connect()
+        await self._cache_device_info()
 
     async def fetch_data(self, idx=None):
         """Fetch all values from the REST."""
@@ -125,7 +147,8 @@ class MyCoordinator(DataUpdateCoordinator):
                 # Note: using context is not required if there is no need or ability to limit
                 # data retrieved from API.
                 # listening_idx = set(self.async_contexts())
-                return await self.fetch_data()  # !!!!!using listening_idx will result in some entities nevwer updated !!!!!
+                await self.fetch_data()  # !!!!!using listening_idx will result in some entities nevwer updated !!!!!
+                await self._cache_device_info()
         except Exception:
             log.warning("Error fetching Judo Water treatment data")
 

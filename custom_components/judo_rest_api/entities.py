@@ -43,12 +43,13 @@ class MyEntity(Entity):
         self,
         config_entry: MyConfigEntry,
         rest_item: RestItem,
-        rest_api: RestAPI,
+        coordinator: MyCoordinator = None,
     ) -> None:
         """Initialize the entity."""
         self._config_entry = config_entry
         self._rest_item = rest_item
-        self._rest_api = rest_api
+        self._coordinator = coordinator
+        self._rest_api = self._coordinator.rest_api
 
         dev_postfix = "_" + self._config_entry.data[CONF.DEVICE_POSTFIX]
 
@@ -74,8 +75,6 @@ class MyEntity(Entity):
             + "_"
             + self._rest_item.translation_key
         )
-
-        self._rest_api = rest_api
 
         match self._rest_item.format:
             case FORMATS.STATUS | FORMATS.TEXT | FORMATS.TIMESTAMP | FORMATS.SW_VERSION:
@@ -111,20 +110,40 @@ class MyEntity(Entity):
                 self._attr_icon = icon
 
     def my_device_info(self) -> DeviceInfo:
-        """Build the device info."""
+        """Build the device info with dynamic values."""
+        # Default fallback values
+        sw_version = "unknown"
+        model = "Judo Device"
+        serial_number = "unknown"
+
+        # Try to get real values from coordinator
+        if self._coordinator is not None:
+            device_info_values = self._coordinator.get_device_info_values()
+
+            if device_info_values["sw_version"]:
+                sw_version = str(device_info_values["sw_version"])
+
+            if device_info_values["model"]:
+                model = str(device_info_values["model"])
+
+            if device_info_values["serial_number"]:
+                serial_number = str(int(device_info_values["serial_number"]))
+
         return {
             "identifiers": {(CONST.DOMAIN, self._dev_device)},
             "translation_key": self._dev_device,
             "translation_placeholders": self._dev_translation_placeholders,
-            "sw_version": "Device_SW_Version",
-            "model": "Device_model",
+            "sw_version": sw_version,
+            "serial_number": serial_number,
+            "model": model,
             "manufacturer": "Judo",
+            "suggested_area": "Utility room",
         }
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return device info."""
-        return MySensorEntity.my_device_info(self)
+        return self.my_device_info()
 
 
 class MySensorEntity(CoordinatorEntity, SensorEntity, MyEntity):
@@ -144,18 +163,13 @@ class MySensorEntity(CoordinatorEntity, SensorEntity, MyEntity):
         """Initialize of MySensorEntity."""
         super().__init__(coordinator, context=idx)
         self.idx = idx
-        MyEntity.__init__(self, config_entry, rest_item, coordinator.rest_api)
+        MyEntity.__init__(self, config_entry, rest_item, coordinator)
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._attr_native_value = self._rest_item.state
         self.async_write_ha_state()
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return MyEntity.my_device_info(self)
 
 
 class MyNumberEntity(CoordinatorEntity, NumberEntity, MyEntity):  # pylint: disable=W0223
@@ -175,8 +189,7 @@ class MyNumberEntity(CoordinatorEntity, NumberEntity, MyEntity):  # pylint: disa
         """Initialize NyNumberEntity."""
         super().__init__(coordinator, context=idx)
         self._idx = idx
-        self._coordinator = coordinator
-        MyEntity.__init__(self, config_entry, rest_item, coordinator.rest_api)
+        MyEntity.__init__(self, config_entry, rest_item, coordinator)
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -191,11 +204,6 @@ class MyNumberEntity(CoordinatorEntity, NumberEntity, MyEntity):  # pylint: disa
         #        await self._coordinator.get_value(self._rest_item)
         self._attr_native_value = self._rest_item.state
         self.async_write_ha_state()
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return MyEntity.my_device_info(self)
 
 
 class MySwitchEntity(CoordinatorEntity, SwitchEntity, MyEntity):  # pylint: disable=W0223
@@ -215,7 +223,7 @@ class MySwitchEntity(CoordinatorEntity, SwitchEntity, MyEntity):  # pylint: disa
         """Initialize NyNumberEntity."""
         super().__init__(coordinator, context=idx)
         self._idx = idx
-        MyEntity.__init__(self, config_entry, rest_item, coordinator.rest_api)
+        MyEntity.__init__(self, config_entry, rest_item, coordinator)
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -237,11 +245,6 @@ class MySwitchEntity(CoordinatorEntity, SwitchEntity, MyEntity):  # pylint: disa
         self._attr_is_on = self._rest_item.state
         self.async_write_ha_state()
 
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return MyEntity.my_device_info(self)
-
 
 class MyButtonEntity(CoordinatorEntity, ButtonEntity, MyEntity):  # pylint: disable=W0223
     """Represent a Number Entity.
@@ -260,17 +263,12 @@ class MyButtonEntity(CoordinatorEntity, ButtonEntity, MyEntity):  # pylint: disa
         """Initialize NyNumberEntity."""
         super().__init__(coordinator, context=idx)
         self._idx = idx
-        MyEntity.__init__(self, config_entry, rest_item, coordinator.rest_api)
+        MyEntity.__init__(self, config_entry, rest_item, coordinator)
 
     async def async_press(self):
         """Turn the entity on."""
         ro = RestObject(self._rest_api, self._rest_item)
         await ro.setvalue()  # rest_item.state will be set inside ro.setvalue
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return MyEntity.my_device_info(self)
 
 
 class MySelectEntity(CoordinatorEntity, SelectEntity, MyEntity):  # pylint: disable=W0223
@@ -290,8 +288,7 @@ class MySelectEntity(CoordinatorEntity, SelectEntity, MyEntity):  # pylint: disa
         """Initialze MySelectEntity."""
         super().__init__(coordinator, context=idx)
         self._idx = idx
-
-        MyEntity.__init__(self, config_entry, rest_item, coordinator.rest_api)
+        MyEntity.__init__(self, config_entry, rest_item, coordinator)
 
         # option list build from the status list of the ModbusItem
         self.options = []
@@ -321,8 +318,3 @@ class MySelectEntity(CoordinatorEntity, SelectEntity, MyEntity):  # pylint: disa
         """Handle updated data from the coordinator."""
         self._attr_current_option = self._rest_item.state
         self.async_write_ha_state()
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return MyEntity.my_device_info(self)
