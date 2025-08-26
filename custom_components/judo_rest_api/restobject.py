@@ -198,6 +198,9 @@ class RestObject:
         if res is None:
             return None
 
+        # Store the raw value in the rest_item
+        self._rest_item.raw_value = res
+
         index = self._rest_item.read_index * 2
         big_endian = res[index : index + self._rest_item.read_bytes * 2]
         little_endian = bytes.fromhex(big_endian)[::-1].hex()

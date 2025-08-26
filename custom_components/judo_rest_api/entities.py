@@ -145,6 +145,18 @@ class MyEntity(Entity):
         """Return device info."""
         return self.my_device_info()
 
+    @property
+    def extra_state_attributes(self):
+        """Return the state attributes."""
+        attrs = {}
+
+        # Add raw REST API response if available
+        if hasattr(self, '_rest_item') and self._rest_item and self._rest_item.raw_value is not None:
+            attrs["raw_value"] = self._rest_item.raw_value
+
+        attrs["address_read"] = self._rest_item.address_read
+
+        return attrs
 
 class MySensorEntity(CoordinatorEntity, SensorEntity, MyEntity):
     """Class that represents a sensor entity.

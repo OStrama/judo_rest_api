@@ -75,6 +75,7 @@ class RestItem:
         self._resultlist = resultlist
         self._params = params
         self._state = None
+        self._raw_value = None
 
     @property
     def params(self) -> dict:
@@ -114,6 +115,16 @@ class RestItem:
     def device(self, val: DeviceConstants):
         """Return device."""
         self._device = val
+
+    @property
+    def raw_value(self):
+        """Return the raw value from REST API."""
+        return self._raw_value
+
+    @raw_value.setter
+    def raw_value(self, val):
+        """Set the raw value from REST API."""
+        self._raw_value = val
 
     @property
     def translation_key(self) -> str:
