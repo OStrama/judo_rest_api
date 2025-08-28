@@ -68,6 +68,8 @@ class MyEntity(Entity):
         # self._dev_device = self._rest_api.get_devicetype()
         self._dev_device = self._rest_item.device
 
+        self._attr_entity_category = self._rest_item.entity_category
+
         self._attr_unique_id = (
             CONST.DOMAIN
             + "_"
@@ -151,12 +153,17 @@ class MyEntity(Entity):
         attrs = {}
 
         # Add raw REST API response if available
-        if hasattr(self, '_rest_item') and self._rest_item and self._rest_item.raw_value is not None:
+        if (
+            hasattr(self, "_rest_item")
+            and self._rest_item
+            and self._rest_item.raw_value is not None
+        ):
             attrs["raw_value"] = self._rest_item.raw_value
 
         attrs["address_read"] = self._rest_item.address_read
 
         return attrs
+
 
 class MySensorEntity(CoordinatorEntity, SensorEntity, MyEntity):
     """Class that represents a sensor entity.

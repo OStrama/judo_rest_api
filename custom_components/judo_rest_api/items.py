@@ -1,5 +1,7 @@
 """Item classes."""
 
+from homeassistant.helpers.entity import EntityCategory
+
 from .const import DeviceConstants, FormatConstants, TypeConstants
 
 
@@ -60,6 +62,7 @@ class RestItem:
         write_bytes=1,
         resultlist=None,
         params: dict = None,
+        entity_category: EntityCategory = None,
     ) -> None:
         """Initialise RestItem."""
         self._translation_key = translation_key
@@ -72,6 +75,7 @@ class RestItem:
         self._format = mformat
         self._type = mtype
         self._device = device
+        self._entity_category = entity_category
         self._resultlist = resultlist
         self._params = params
         self._state = None
@@ -115,6 +119,11 @@ class RestItem:
     def device(self, val: DeviceConstants):
         """Return device."""
         self._device = val
+
+    @property
+    def entity_category(self) -> EntityCategory:
+        """Return entity category."""
+        return self._entity_category
 
     @property
     def raw_value(self):
