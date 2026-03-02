@@ -75,22 +75,36 @@ class MyCoordinator(DataUpdateCoordinator):
         return None
 
     async def _cache_device_info(self):
-        """Cache device info with translations."""
-        model = None
+        """Cache device info with translations; skips update when values unchanged."""
+        sw_version = self.get_value_from_item("software_version")
+        serial_number = self.get_value_from_item("device_number")
+
+        model = self._cached_device_info.get("model")
+        device_type_changed = False
         for item in self._restitems:
             if item.translation_key == "device_type" and item.state:
-                translations = await async_get_translations(
-                    self.hass, self.hass.config.language, "entity", {CONST.DOMAIN}
-                )
-                translation_key = f"component.{CONST.DOMAIN}.entity.sensor.device_type.state.{item.state}"
-                model = translations.get(translation_key, item.state)
+                new_raw_model = item.state
+                if model is None or self._cached_device_info.get("_raw_model") != new_raw_model:
+                    translations = await async_get_translations(
+                        self.hass, self.hass.config.language, "entity", {CONST.DOMAIN}
+                    )
+                    translation_key = f"component.{CONST.DOMAIN}.entity.sensor.device_type.state.{new_raw_model}"
+                    model = translations.get(translation_key, new_raw_model)
+                    device_type_changed = True
                 break
 
-        self._cached_device_info = {
-            "sw_version": self.get_value_from_item("software_version"),
+        new_info = {
+            "sw_version": sw_version,
             "model": model,
-            "serial_number": self.get_value_from_item("device_number"),
+            "serial_number": serial_number,
         }
+        if device_type_changed or new_info != {k: v for k, v in self._cached_device_info.items() if k != "_raw_model"}:
+            if device_type_changed:
+                for item in self._restitems:
+                    if item.translation_key == "device_type" and item.state:
+                        new_info["_raw_model"] = item.state
+                        break
+            self._cached_device_info = new_info
 
     def get_device_info_values(self) -> dict:
         """Get cached device info values."""
@@ -109,29 +123,25 @@ class MyCoordinator(DataUpdateCoordinator):
         await self._rest_api.connect()
         await self._cache_device_info()
 
+    async def _fetch_item(self, item: RestItem) -> None:
+        """Fetch a single item value, logging warnings on failure."""
+        try:
+            await self.get_value(item)
+        except Exception:
+            log.warning(
+                "connection to Judo Water treatment failed for %s",
+                item.translation_key,
+            )
+
     async def fetch_data(self, idx=None):
-        """Fetch all values from the REST."""
-        # if idx is not None:
-        if idx is None:
-            # first run: Update all entitiies
-            to_update = tuple(range(len(self._restitems)))
-        elif len(idx) == 0:
-            # idx exists but is not yet filled up: Update all entitiys.
-            to_update = tuple(range(len(self._restitems)))
+        """Fetch all values from the REST in parallel."""
+        if idx is None or len(idx) == 0:
+            to_update = range(len(self._restitems))
         else:
-            # idx exists and is filled up: Update only entitys requested by the coordinator.
             to_update = idx
 
-        # log.info("Start Scan")
-        for index in to_update:
-            item = self._restitems[index]
-            try:
-                await self.get_value(item)
-            except Exception:
-                log.warning(
-                    "connection to Judo Water treatment failed for %s",
-                    item.translation_key,
-                )
+        items = [self._restitems[i] for i in to_update]
+        await asyncio.gather(*[self._fetch_item(item) for item in items])
 
     async def _async_update_data(self):
         """Fetch data from API endpoint.

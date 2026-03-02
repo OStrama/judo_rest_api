@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 from functools import partial
 import requests
+from requests.adapters import HTTPAdapter
 from homeassistant.core import HomeAssistant
 
 from .configentry import MyConfigEntry
@@ -48,23 +49,18 @@ class RestAPI:
         )
         self._api_url = self._base_url + "/api/rest/"
         self._devicetype = None
-        self._session = None
         self._connected = False
+        adapter = HTTPAdapter(pool_connections=1, pool_maxsize=4)
+        self._session = requests.Session()
+        self._session.auth = (self._username, self._password)
+        self._session.mount("http://", adapter)
+        self._session.mount("https://", adapter)
 
     async def login(self) -> None:
         """Log into the portal. Create cookie to stay logged in for the session."""
-
-        _useless = await self._hass.async_add_executor_job(
-            partial(
-                requests.get,
-                url=self._base_url,
-                auth=(self._username, self._password),
-                timeout=10,
-            )
+        await self._hass.async_add_executor_job(
+            partial(self._session.get, url=self._base_url, timeout=10)
         )
-
-        # r = requests.get(self._base_url, auth=(self._username, self._password), timeout=10 )
-        # log.warning(r.text)
 
     async def get_rest(self, command: str):
         """get raw response from REST api"""
@@ -76,12 +72,7 @@ class RestAPI:
             log.debug("Send command %s", command)
             url = self._api_url + command
             response = await self._hass.async_add_executor_job(
-                partial(
-                    requests.get,
-                    url=url,
-                    auth=(self._username, self._password),
-                    timeout=10,
-                )
+                partial(self._session.get, url=url, timeout=10)
             )
             log.debug("Response %s", response.status_code)
             status = response.status_code
@@ -110,12 +101,7 @@ class RestAPI:
         try:
             url = self._api_url + command + towrite
             response = await self._hass.async_add_executor_job(
-                partial(
-                    requests.get,
-                    url=url,
-                    auth=(self._username, self._password),
-                    timeout=2,
-                )
+                partial(self._session.get, url=url, timeout=2)
             )
             res = await self._hass.async_add_executor_job(response.json)
             return res["data"]
@@ -170,10 +156,22 @@ class RestObject:
     def order_hex_buffer(self, buffer: str, flip) -> str:
         """brings a hex buffer in the right order"""
         if flip is True:
-            little_endian = bytes.fromhex(buffer)[::-1].hex()
-            return little_endian
-        big_endian = bytes.fromhex(buffer)[::1].hex()
-        return big_endian
+            return bytes.fromhex(buffer)[::-1].hex()
+        return bytes.fromhex(buffer).hex()
+
+    def _parse_hex_buffer(self, res: str) -> tuple[str, str] | None:
+        """Extract and decode a hex slice from a REST response.
+
+        Returns (big_endian, little_endian) strings, or None when the slice is empty.
+        """
+        index = self._rest_item.read_index * 2
+        raw = res[index : index + self._rest_item.read_bytes * 2]
+        if not raw:
+            return None
+        buf = bytes.fromhex(raw)
+        big_endian = buf.hex()
+        little_endian = buf[::-1].hex()
+        return big_endian, little_endian
 
     def format_int_message(self, number: int, flip) -> str:
         """format int message as hex buffer to be sent to REST APPI"""
@@ -201,19 +199,10 @@ class RestObject:
         # Store the raw value in the rest_item
         self._rest_item.raw_value = res
 
-        index = self._rest_item.read_index * 2
-        big_endian = res[index : index + self._rest_item.read_bytes * 2]
-        little_endian = bytes.fromhex(big_endian)[::-1].hex()
-        big_endian = bytes.fromhex(big_endian)[::1].hex()
-
-        if big_endian is None:
+        parsed = self._parse_hex_buffer(res)
+        if parsed is None:
             return None
-        if little_endian is None:
-            return None
-        if big_endian == "":
-            return None
-        if little_endian == "":
-            return None
+        big_endian, little_endian = parsed
         match self._rest_item.format:
             case FORMATS.SWITCH:
                 return None
@@ -308,19 +297,10 @@ class RestObject:
         if res is None:
             return None
 
-        index = self._rest_item.read_index * 2
-        big_endian = res[index : index + self._rest_item.read_bytes * 2]
-        little_endian = bytes.fromhex(big_endian)[::-1].hex()
-        big_endian = bytes.fromhex(big_endian)[::1].hex()
-
-        if big_endian is None:
+        parsed = self._parse_hex_buffer(res)
+        if parsed is None:
             return None
-        if little_endian is None:
-            return None
-        if big_endian == "":
-            return None
-        if little_endian == "":
-            return None
+        _big_endian, little_endian = parsed
         offset = float(int(little_endian, 16) / self._divider)
 
         #        self._rest_item.state = value + offset
