@@ -121,7 +121,14 @@ Fehlgeschlagene Abrufe loggen Befehl und Ursache (`Judo REST API call <cmd> fail
 
 ## Lizenz
 
-Apache License 2.0, siehe [LICENSE](LICENSE). Nicht MIT.
+Apache License 2.0, siehe [LICENSE](LICENSE).
+
+```
+Copyright 2025 OStrama und Beitragende (Original: https://github.com/OStrama/judo_rest_api)
+Änderungen Copyright 2026 AndyKausG
+```
+
+Änderungen gegenüber dem Original sind in der Git-Historie und im Abschnitt [Änderungen](#änderungen-gegenüber-dem-original) dokumentiert. Beiträge zu diesem Repository stehen unter derselben Lizenz.
 
 ## Haftungsausschluss
 
