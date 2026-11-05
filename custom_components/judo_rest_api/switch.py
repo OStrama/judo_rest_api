@@ -10,7 +10,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .configentry import MyConfigEntry
 from .const import TYPES
 from .entity_helpers import build_entity_list
-from .jdconst import DEVICELISTS
 
 logging.basicConfig()
 log: logging.Logger = logging.getLogger(name=__name__)
@@ -30,7 +29,7 @@ async def async_setup_entry(
     # we create one communicator per integration only for better performance and to allow dynamic parameters
     coordinator = config_entry.runtime_data.coordinator
 
-    for device in DEVICELISTS:
+    for device in [coordinator.rest_items]:
         entries = await build_entity_list(
             entries=entries,
             config_entry=config_entry,
@@ -41,5 +40,5 @@ async def async_setup_entry(
 
     async_add_entities(
         entries,
-        update_before_add=True,
+        update_before_add=False,
     )

@@ -1,12 +1,11 @@
 """The Update Coordinator for the RestItems."""
 
-import asyncio
 import logging
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.translation import async_get_translations
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .configentry import MyConfigEntry
 from .const import CONF, CONST, TYPES
@@ -47,8 +46,12 @@ class MyCoordinator(DataUpdateCoordinator):
         self._config_entry = p_config_entry
         self._cached_device_info = {}
 
-    async def get_value(self, rest_item: RestItem):
-        """Read a value from the rest API"""
+    async def get_value(self, rest_item: RestItem, responses: dict | None = None):
+        """Read a value from the rest API.
+
+        responses caches raw answers per address, so each address is only
+        requested once per update cycle.
+        """
 
         if rest_item.type in (TYPES.SELECT_NOIF, TYPES.BUTTON):
             return None
@@ -57,7 +60,12 @@ class MyCoordinator(DataUpdateCoordinator):
             log.warning("RestObject is None for Item %s", rest_item.translation_key)
             # rest_item.state = None
         else:
-            val = await ro.value
+            if responses is None:
+                responses = {}
+            address = rest_item.address_read
+            if address not in responses:
+                responses[address] = await self._rest_api.get_rest(address)
+            val = ro.parse(responses[address])
             if val is not None:
                 log.debug(
                     "Set Value %s for Item %s", str(val), rest_item.translation_key
@@ -106,7 +114,18 @@ class MyCoordinator(DataUpdateCoordinator):
         coordinator.async_config_entry_first_refresh.
         """
         # await self._rest_api.login()
-        await self._rest_api.connect()
+        if await self._rest_api.connect() is None:
+            # first refresh turns this into ConfigEntryNotReady -> HA retries with backoff
+            raise UpdateFailed(
+                "Judo Water treatment not reachable"
+            )
+        # drop commands the device type does not support; some command codes
+        # have a different (writing) meaning on other device types
+        devicetype = self._rest_api.get_devicetype()
+        self._restitems = [
+            item for item in self._restitems if item.supports(devicetype)
+        ]
+        self._number_of_items = len(self._restitems)
         await self._cache_device_info()
 
     async def fetch_data(self, idx=None):
@@ -123,15 +142,17 @@ class MyCoordinator(DataUpdateCoordinator):
             to_update = idx
 
         # log.info("Start Scan")
+        responses = {}
         for index in to_update:
             item = self._restitems[index]
             try:
-                await self.get_value(item)
+                await self.get_value(item, responses)
             except Exception:
                 log.warning(
                     "connection to Judo Water treatment failed for %s",
                     item.translation_key,
                 )
+        return responses
 
     async def _async_update_data(self):
         """Fetch data from API endpoint.
@@ -139,18 +160,20 @@ class MyCoordinator(DataUpdateCoordinator):
         This is the place to pre-process the data to lookup tables
         so entities can quickly look up their data.
         """
-        try:
-            # Note: asyncio.TimeoutError and aiohttp.ClientError are already
-            # handled by the data update coordinator.
-            async with asyncio.timeout(60):
-                # Grab active context variables to limit data required to be fetched from API
-                # Note: using context is not required if there is no need or ability to limit
-                # data retrieved from API.
-                # listening_idx = set(self.async_contexts())
-                await self.fetch_data()  # !!!!!using listening_idx will result in some entities nevwer updated !!!!!
-                await self._cache_device_info()
-        except Exception:
-            log.warning("Error fetching Judo Water treatment data")
+        # No overall asyncio.timeout here: cancelling would leave the executor
+        # jobs running against the device. Each request has its own timeout.
+        # Grab active context variables to limit data required to be fetched from API
+        # listening_idx = set(self.async_contexts())
+        responses = await self.fetch_data()  # !!!!!using listening_idx will result in some entities nevwer updated !!!!!
+        if not any(res is not None for res in responses.values()):
+            # mark entities unavailable instead of silently keeping stale values
+            raise UpdateFailed("No data received from Judo Water treatment")
+        await self._cache_device_info()
+
+    @property
+    def rest_items(self) -> list[RestItem]:
+        """Return the rest items supported by the device."""
+        return self._restitems
 
     @property
     def rest_api(self):

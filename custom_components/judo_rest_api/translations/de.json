@@ -16,7 +16,7 @@
                     "host": "Hostname oder IP Adresse",
                     "port": "HTTP Port",
                     "username": "Benutzername",
-                    "password": "Passwor1"
+                    "password": "Passwort"
                 }
             },
             "reconfigure": {
@@ -26,7 +26,7 @@
                     "host": "Hostname oder IP Adresse",
                     "port": "HTTP Port",
                     "username": "Benutzername",
-                    "password": "Passwor1"
+                    "password": "Passwort"
                 }
             }
         }

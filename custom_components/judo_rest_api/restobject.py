@@ -5,6 +5,7 @@ It contains a REST Client for setting and getting REST response values
 """
 
 import logging
+import threading
 from datetime import datetime
 from functools import partial
 import requests
@@ -50,6 +51,22 @@ class RestAPI:
         self._devicetype = None
         self._session = None
         self._connected = False
+        # The Judo connectivity module handles only one request at a time.
+        # The lock lives at thread level, so a cancelled coroutine cannot
+        # release it while its executor job still talks to the device.
+        self._request_lock = threading.Lock()
+
+    def _request(self, url: str, timeout: int):
+        """Blocking, serialized GET request. Runs in the executor."""
+        with self._request_lock:
+            response = requests.get(
+                url=url,
+                auth=(self._username, self._password),
+                headers={"Connection": "close"},
+                timeout=timeout,
+            )
+            response.close()
+            return response
 
     async def login(self) -> None:
         """Log into the portal. Create cookie to stay logged in for the session."""
@@ -76,28 +93,29 @@ class RestAPI:
             log.debug("Send command %s", command)
             url = self._api_url + command
             response = await self._hass.async_add_executor_job(
-                partial(
-                    requests.get,
-                    url=url,
-                    auth=(self._username, self._password),
-                    timeout=10,
-                )
+                partial(self._request, url=url, timeout=10)
             )
             log.debug("Response %s", response.status_code)
             status = response.status_code
             if status == 200:
-                res = await self._hass.async_add_executor_job(response.json)
+                res = response.json()
                 log.debug("Content %s", str(res["data"]))
                 return res["data"]
             else:
-                log.warning("Content ignored for API return status %s", str(status))
+                log.warning(
+                    "Content ignored for API call %s, return status %s",
+                    command,
+                    str(status),
+                )
                 return None
-        except Exception:
+        except Exception as err:
             if response is not None:
                 status = str(response.status_code)
             else:
                 status = "unknown status"
-            log.warning("Judo REST API call failed with %s", status)
+            log.warning(
+                "Judo REST API call %s failed with %s: %r", command, status, err
+            )
             return None
 
     async def set_rest(self, command: str, towrite: str):
@@ -110,14 +128,9 @@ class RestAPI:
         try:
             url = self._api_url + command + towrite
             response = await self._hass.async_add_executor_job(
-                partial(
-                    requests.get,
-                    url=url,
-                    auth=(self._username, self._password),
-                    timeout=2,
-                )
+                partial(self._request, url=url, timeout=2)
             )
-            res = await self._hass.async_add_executor_job(response.json)
+            res = response.json()
             return res["data"]
         except Exception:
             log.warning("Connection to Judo Water Treatment failed")
@@ -134,7 +147,7 @@ class RestAPI:
             return True
 
         log.warning("Unknown Device detected, ID=%s", res)
-        return None
+        return False
 
     def close(self):
         """Close REST connection."""
@@ -194,8 +207,13 @@ class RestObject:
             return None
 
         res = await self._rest_api.get_rest(self._rest_item.address_read)
+        return self.parse(res)
 
+    def parse(self, res):
+        """Convert a raw REST response into the item value."""
         if res is None:
+            return None
+        if self._rest_item.format is FORMATS.BUTTON:
             return None
 
         # Store the raw value in the rest_item

@@ -183,6 +183,8 @@ class MySensorEntity(CoordinatorEntity, SensorEntity, MyEntity):
         super().__init__(coordinator, context=idx)
         self.idx = idx
         MyEntity.__init__(self, config_entry, rest_item, coordinator)
+        # values from the first refresh, before the first coordinator update
+        self._attr_native_value = self._rest_item.state
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -209,6 +211,7 @@ class MyNumberEntity(CoordinatorEntity, NumberEntity, MyEntity):  # pylint: disa
         super().__init__(coordinator, context=idx)
         self._idx = idx
         MyEntity.__init__(self, config_entry, rest_item, coordinator)
+        self._attr_native_value = self._rest_item.state
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -318,7 +321,7 @@ class MySelectEntity(CoordinatorEntity, SelectEntity, MyEntity):  # pylint: disa
             self._rest_item.state = self.options[0]
             self._attr_current_option = self._rest_item.state
         else:
-            self._attr_current_option = "FEHLER"
+            self._attr_current_option = self._rest_item.state
 
     async def async_select_option(self, option: str) -> None:
         """Write the selected option to modbus and refresh HA."""

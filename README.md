@@ -1,69 +1,135 @@
-# Version 1.0.3
-Added control for changing salt mass. The control shows the current salt mass. When refilling, the mass that was refilled has to be added to the shown mass.
+# Judo REST API für Home Assistant
 
-# judo_rest_api
-Home Assistant integration to connect to judo water treatment directly via REST API based on this documentation:
-https://judo.eu/app/uploads/2024/11/API-KOMMANDOZEILEN.pdf
-Some more basic info can be found here: https://judo.eu/app/downloads/files/de/8203521/manuals/1702574_202405.pdf
+Lokale Home-Assistant-Integration für Judo-Wasseraufbereitung (Enthärter, Leckageschutz u. a.) über die REST-API des Judo Connectivity-Moduls (WLAN). Polling im Intervall, keine Cloud.
 
-Please have a look here to learn more about the communication module that provides the REST API:
+> Inoffizielle Integration, nicht mit Judo verbunden. Siehe [Haftungsausschluss](#haftungsausschluss).
 
-https://judo.eu/produkte/connectivity-modul-wlan/
+Basiert auf [OStrama/judo_rest_api](https://github.com/OStrama/judo_rest_api). Dieser Fork enthält Stabilitätsfixes und eine Filterung der Kommandos nach Gerätetyp (siehe [Änderungen](#änderungen-gegenüber-dem-original)).
 
-# Judo_rest_api
+## Dokumentation der API
 
-This integration lets you monitor and control your Judo water treatment device locally through it's REST API.
-![image](https://github.com/user-attachments/assets/50a6e267-7844-46cf-a449-fa1fdc747504)
+* Kommandoreferenz (Judo): <https://judo.eu/ftp-upload/download/REST-API/RESTAPI_Kommandos.pdf>
+* Connectivity-Modul: <https://judo.eu/produkte/connectivity-modul-wlan/>
 
-
-
-
+Die Integration folgt dieser Referenz. Welche Kommandos ein Gerät kennt, hängt vom Gerätetyp ab (Abruf `/api/rest/FF00`).
 
 ## Installation
 
-### HACS (manually add Repository)
+### HACS (benutzerdefiniertes Repository)
 
-Add this repository to HACS.
-* In the HACS GUI, select "Custom repositories"
-* Enter the following repository URL: https://github.com/OStrama/judo_rest_api
-* Category: Integration
-* After adding the integration, restart Home Assistant.
-* Now press the button "Add Integration" in Configuration -> Integrations to install it in Home assistant.
-* Now under Configuration -> Integrations, "Judo REST API" should be available.
+1. HACS → Integrationen → ⋮ → *Benutzerdefinierte Repositories*
+2. URL `https://github.com/AndyKausG/judo_rest_api`, Kategorie *Integration*
+3. „Judo Rest API“ installieren, Home Assistant neu starten
+4. Einstellungen → Geräte & Dienste → Integration hinzufügen → *Judo Wasseraufbereitung*
 
-### Manual install
+### Manuell
 
-Create a directory called `judo_rest_api` in the `<config directory>/custom_components/` directory on your Home Assistant
-instance. Install this component by copying all files in `/custom_components/judo_rest_api/` folder from this repo into the
-new `<config directory>/custom_components/judo_rest_api/` directory you just created.
+Inhalt von `custom_components/judo_rest_api/` nach `<config>/custom_components/judo_rest_api/` kopieren, Home Assistant neu starten.
 
-This is how your custom_components directory should look like:
+Die Domain `judo_rest_api` ist identisch mit dem Original. Ein bestehender Eintrag und seine Statistiken bleiben beim Wechsel erhalten. Beide Varianten lassen sich nicht parallel installieren.
+
+## Konfiguration
+
+| Feld | Standard | Beschreibung |
+|---|---|---|
+| Host | – | IP oder Hostname des Connectivity-Moduls |
+| Port | 80 | HTTP-Port |
+| Benutzername | `admin` | Zugang des Moduls (im Web-Interface des Moduls änderbar) |
+| Passwort | `Connectivity` | wie oben |
+| Device postfix | leer | Nur für mehrere Geräte in einer HA-Instanz: Suffix für Gerät und Entities. Bei einem Gerät leer lassen. |
+| Abfrageintervall | 60 s | Zu kleine Werte provozieren Timeouts, das Modul ist langsam. Bei Problemen 300 s probieren. |
+
+Der Eintrag lässt sich über *Neu konfigurieren* ändern, danach wird die Integration neu geladen.
+
+## Entities
+
+Es werden nur Entities angelegt, deren Kommando der erkannte Gerätetyp laut Judo-Doku kennt.
+
+| Entity | Kommando | Enthärter i-soft / i-soft PRO | SOFTwell | ZEWA / PROM i-SAFE, i-dos eco, i-fill |
+|---|---|:-:|:-:|:-:|
+| Gerätetyp, Gerätenummer, Softwareversion, Inbetriebnahme | FF, 06, 01, 0E | ✓ | ✓ | ✓ |
+| Gesamtwassermenge (m³) | 28 | ✓ | – | ✓ |
+| Weichwassermenge (m³) | 29 | ✓ | ✓ | – |
+| Betriebszeit (Minuten/Stunden/Tage) | 25 | ✓ | ✓ | – |
+| Wasserhärte (Number) | 51 / 30 | ✓ | – | – |
+| Salzvorrat Masse (Number, Sensor), Salzreichweite, Salzwarnung | 56, 57 | ✓ | – | – |
+| Kundendienst-Kontakt | 58 | ✓ | – | – |
+| Buttons: Regeneration starten, Leckageschutz öffnen/schließen | 35, 3C, 3D | ✓ | – | – |
+
+Hinweis: Die Tabelle zeigt, was die Filterliste im Code vorsieht. Getestet wurde bisher nur am **SOFTwell P (Typ 0x34)**.
+
+Unbekannte Gerätetypen bekommen alle Entities (wie im Original).
+
+### Wasserzähler im Energie-Dashboard
+
+`Weichwassermenge` bzw. `Gesamtwassermenge` haben `device_class: water`, `state_class: total_increasing`, Einheit m³ und lassen sich direkt als Wasserverbrauch wählen. Beim SOFTwell ist die Weichwassermenge der einzige Zähler (die Gesamtwassermenge liefert dort dauerhaft 0 und wird nicht mehr abgefragt).
+
+Einen Durchfluss gibt die API des SOFTwell nicht her. Als Näherung: Helfer *Ableitung* (Derivative) auf die Weichwassermenge, Zeiteinheit Stunden, Einheit m³/h, Zeitfenster ca. 5 min. Die Auflösung ist durch Zähler (1 l) und Intervall begrenzt.
+
+## Funktionsweise
+
+* Ein `DataUpdateCoordinator` fragt alle Werte zyklisch ab. Jede Adresse wird pro Zyklus nur einmal angefragt (z. B. liefert `2500` Minuten, Stunden und Tage in einer Antwort).
+* **Alle Requests laufen strikt nacheinander** (Lock im Executor-Thread, `Connection: close`). Das Connectivity-Modul verarbeitet nur eine Anfrage gleichzeitig. Parallele oder abgebrochene Requests lassen es hängen, danach antwortet es nicht einmal mehr auf TCP-Ebene, bis es stromlos gemacht wurde.
+* Antwortet das Gerät beim Setup nicht, wiederholt HA das Setup selbst mit wachsenden Abständen (*Einrichtungsfehler, wird erneut versucht*).
+* Kommt im Betrieb keine einzige Antwort an, werden die Entities „nicht verfügbar“, statt alte Werte weiter zu zeigen.
+* Schreibzugriffe (Number, Select, Buttons) gehen als `GET`-Request mit hex-kodierter Nutzlast an `/api/rest/<cmd><data>`.
+
+## Fehlersuche
+
+Erreichbarkeit direkt prüfen (vom HA-Host aus):
 
 ```bash
-custom_components
-├── judo_rest_api
-│   ├── __init__.py
-│   ├── ...
-│   ├── ...
-│   ├── ...
-│   └── sensor.py  
+curl -s -m 10 -w ' HTTP %{http_code}\n' -u admin:Connectivity http://<ip>/api/rest/FF00
 ```
-## Configuration
-![image](https://github.com/user-attachments/assets/36f25cdd-d969-4b80-bdf8-bdedd86e57ad)
 
+Erwartet: `{"data": "34"} HTTP 200` (Gerätetyp als Hex).
 
-The only mandatory parameters are:
-* The IP-Address of your Judo water treatment device. The port should be ok at default (80) unless you changed it in the configuration of the connectivity module.
-* The user name. The default value of the connectivity module is "admin". You can change it on the web interface of the connectivity module
-* The password. The default value of the connectivity module is "Connectivity". You can change it on the web interface of the connectivity module
+| Ergebnis | Bedeutung |
+|---|---|
+| Timeout schon beim Verbindungsaufbau | Modul hängt (Webserver/WLAN) oder falsche IP. Connectivity-Modul kurz stromlos machen, DHCP-Reservierung einrichten. |
+| HTTP 401 | Benutzername oder Passwort falsch |
+| `{"data": ""}` | Kommando vom Gerät nicht unterstützt oder Gerät gerade beschäftigt |
 
-The "Device Postfix" has a default value of "". It can be used to add multiple devices to one home assistant. For compatibility this should be left empty. If you want to add another device, use a name that helps to identify the devices.
-The "Scan interval" determines how often the REST API is polled. The default value is every 60 seconds. Too small values will cause more timeouts.
+Debug-Log:
 
+```yaml
+logger:
+  default: warning
+  logs:
+    custom_components.judo_rest_api: debug
+```
 
-# Disclaimer
-The developers of this integration are not affiliated with Judo. They have created the integration as open source in their spare time on the basis of publicly accessible information. 
-The use of the integration is at the user's own risk and responsibility. The developers are not liable for any damages arising from the use of the integration.
+Fehlgeschlagene Abrufe loggen Befehl und Ursache (`Judo REST API call <cmd> failed with ...`).
 
+## Änderungen gegenüber dem Original
 
-More coming soon to this theater ;-)
+**1.0.6**
+* SOFTwell: Gesamtwassermenge (0x28) nicht mehr abgefragt, neue Typcodes 59/63/5A/62/64 mit demselben Filter
+
+**1.0.5**
+* Kommandos werden nach Gerätetyp gefiltert. Auf ZEWA i-SAFE und i-fill bedeuten `5100` „Leckageschutz schließen“ und `5700`/`5800` Urlaubsmodus. Die alte Version hat diese als Leseabfragen bei jedem Zyklus gesendet.
+
+**1.0.4**
+* Strikt serielle Requests, kein Abbruch durch globales `asyncio.timeout`, jede Adresse einmal pro Zyklus
+* `UpdateFailed` statt verschluckter Exceptions, `ConfigEntryNotReady` bei nicht erreichbarem Gerät
+* `update_before_add` aus (Lastspitze beim Start)
+* Fehlerlogs mit Befehl und Ursache, Korrektur „Passwor1“ → „Passwort“ in der deutschen Übersetzung
+
+## Entwicklung
+
+`custom_components/judo_rest_api/jdconst.py` enthält die Item-Liste. Neue Items bekommen bei Bedarf `exclude_types=(...)` mit den Gerätetyp-Codes (Hex, Großbuchstaben), auf denen das Kommando nicht existiert oder etwas anderes bewirkt. `judo_rest_test.py` ist ein einfaches Skript zum Abfragen der API ohne HA.
+
+## Lizenz
+
+Apache License 2.0, siehe [LICENSE](LICENSE).
+
+```
+Copyright 2025 OStrama und Beitragende (Original: https://github.com/OStrama/judo_rest_api)
+Änderungen Copyright 2026 AndyKausG
+```
+
+Änderungen gegenüber dem Original sind in der Git-Historie und im Abschnitt [Änderungen](#änderungen-gegenüber-dem-original) dokumentiert. Beiträge zu diesem Repository stehen unter derselben Lizenz.
+
+## Haftungsausschluss
+
+Die Entwickler sind nicht mit Judo verbunden. Die Integration entstand als Open Source in der Freizeit auf Basis öffentlich zugänglicher Informationen. Die Nutzung erfolgt auf eigene Gefahr, es wird keine Haftung für Schäden übernommen. Das gilt besonders für Schreibzugriffe wie das Schließen des Leckageschutzes.

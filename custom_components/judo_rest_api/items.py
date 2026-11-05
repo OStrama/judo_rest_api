@@ -63,6 +63,7 @@ class RestItem:
         resultlist=None,
         params: dict = None,
         entity_category: EntityCategory = None,
+        exclude_types: tuple[str, ...] = (),
     ) -> None:
         """Initialise RestItem."""
         self._translation_key = translation_key
@@ -78,8 +79,15 @@ class RestItem:
         self._entity_category = entity_category
         self._resultlist = resultlist
         self._params = params
+        self._exclude_types = exclude_types
         self._state = None
         self._raw_value = None
+
+    def supports(self, devicetype: str | None) -> bool:
+        """Return False if the device type does not know this command."""
+        if devicetype is None:
+            return True
+        return devicetype.upper() not in self._exclude_types
 
     @property
     def params(self) -> dict:

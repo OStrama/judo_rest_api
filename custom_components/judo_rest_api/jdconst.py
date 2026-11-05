@@ -215,6 +215,22 @@ PARAMS_MASS_REFILL: dict = {
     "unit": UnitOfMass.KILOGRAMS,
     "stateclass": SensorStateClass.MEASUREMENT
 }
+# Device types that do not support a command, according to the Judo
+# documents "RESTAPI Kommandos Geraetetypen SW3.07" (2023-10-09) and the
+# newer "RESTAPI Kommandos". Undocumented device types keep all items.
+# SOFTwell P/S/K/KP/KS, old and new type codes
+SOFTWELL_TYPES: tuple = ("34", "35", "36", "47", "48", "59", "63", "5A", "62", "64")
+# no softener: ZEWA/PROM i-SAFE, i-dos eco, i-fill.
+# Careful: on these devices e.g. 5100 closes the leakage protection
+# and 5700/5800 start/stop the vacation mode.
+NO_SOFTENER_TYPES: tuple = ("44", "41", "3C")
+# hardness, salt, service address, regeneration, leakage protection/alarm
+EXCL_SOFTENER_CTRL: tuple = SOFTWELL_TYPES + NO_SOFTENER_TYPES
+# operating hours, soft water
+EXCL_SOFTENER_DATA: tuple = NO_SOFTENER_TYPES
+# total water: no longer listed for SOFTwell in the newer document
+EXCL_TOTAL_WATER: tuple = SOFTWELL_TYPES
+
 # pylint: disable=line-too-long
 
 # fmt: off
@@ -223,25 +239,25 @@ REST_SYS_ITEMS: list[RestItem] = [
     RestItem( address_read="0600", read_bytes = 4, read_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params=PARAMS_INFO, translation_key="device_number", entity_category=EntityCategory.DIAGNOSTIC),
     RestItem( address_read="0100", read_bytes = 3, read_index=0, mformat=FORMATS.SW_VERSION, mtype=TYPES.SENSOR, device=DEVICES.SYS, params=PARAMS_INFO, translation_key="software_version", entity_category=EntityCategory.DIAGNOSTIC),
 
-    RestItem( address_read="5100", read_bytes = 2, read_index=0, address_write="3000", write_bytes = 1, write_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.NUMBER, device=DEVICES.SYS, params=PARAMS_GDH,translation_key="water_hardeness"),
-    RestItem( address_read="5700", read_bytes = 1, read_index=0, address_write="5700", write_bytes = 1, write_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.NUMBER, device=DEVICES.SYS, params=PARAMS_DAYS,translation_key="salt_warning", entity_category=EntityCategory.CONFIG),
+    RestItem( address_read="5100", read_bytes = 2, read_index=0, address_write="3000", write_bytes = 1, write_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.NUMBER, device=DEVICES.SYS, params=PARAMS_GDH,translation_key="water_hardeness", exclude_types=EXCL_SOFTENER_CTRL),
+    RestItem( address_read="5700", read_bytes = 1, read_index=0, address_write="5700", write_bytes = 1, write_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.NUMBER, device=DEVICES.SYS, params=PARAMS_DAYS,translation_key="salt_warning", entity_category=EntityCategory.CONFIG, exclude_types=EXCL_SOFTENER_CTRL),
 
 #   RestItem( address_read="5600", read_bytes = 2, read_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params= PARAMS_MASS, translation_key="salt_storage_mass"),
-    RestItem( address_read="5600", read_bytes = 2, read_index=0, address_write="5600", write_bytes = 2, write_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.NUMBER, device=DEVICES.SYS, params=PARAMS_MASS_REFILL, translation_key="salt_storage_mass", entity_category=EntityCategory.CONFIG),
-    RestItem( address_read="5600", read_bytes = 2, read_index=2, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params=PARAMS_DAYS, translation_key="salt_storage_days"),
+    RestItem( address_read="5600", read_bytes = 2, read_index=0, address_write="5600", write_bytes = 2, write_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.NUMBER, device=DEVICES.SYS, params=PARAMS_MASS_REFILL, translation_key="salt_storage_mass", entity_category=EntityCategory.CONFIG, exclude_types=EXCL_SOFTENER_CTRL),
+    RestItem( address_read="5600", read_bytes = 2, read_index=2, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params=PARAMS_DAYS, translation_key="salt_storage_days", exclude_types=EXCL_SOFTENER_CTRL),
 
-    RestItem( address_read="2800", read_bytes = 4, read_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params=PARAMS_QBM_H, translation_key="water_total"),
-    RestItem( address_read="2900", read_bytes = 4, read_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params=PARAMS_QBM_W, translation_key="water_treated"),
+    RestItem( address_read="2800", read_bytes = 4, read_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params=PARAMS_QBM_H, translation_key="water_total", exclude_types=EXCL_TOTAL_WATER),
+    RestItem( address_read="2900", read_bytes = 4, read_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params=PARAMS_QBM_W, translation_key="water_treated", exclude_types=EXCL_SOFTENER_DATA),
 
-    RestItem( address_read="5800", read_bytes = 16, read_index=0, mformat=FORMATS.TEXT, mtype=TYPES.SENSOR, device=DEVICES.SYS, params=PARAMS_CONTACT, translation_key="service_contact", entity_category=EntityCategory.DIAGNOSTIC),
-    RestItem( address_read="2500", read_bytes = 1, read_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params=PARAMS_MINUTES, translation_key="operating_minutes", entity_category=EntityCategory.DIAGNOSTIC),
-    RestItem( address_read="2500", read_bytes = 1, read_index=1, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params=PARAMS_HOURS, translation_key="operating_hours", entity_category=EntityCategory.DIAGNOSTIC),
-    RestItem( address_read="2500", read_bytes = 2, read_index=2, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params=PARAMS_DAYS, translation_key="operating_days", entity_category=EntityCategory.DIAGNOSTIC),
+    RestItem( address_read="5800", read_bytes = 16, read_index=0, mformat=FORMATS.TEXT, mtype=TYPES.SENSOR, device=DEVICES.SYS, params=PARAMS_CONTACT, translation_key="service_contact", entity_category=EntityCategory.DIAGNOSTIC, exclude_types=EXCL_SOFTENER_CTRL),
+    RestItem( address_read="2500", read_bytes = 1, read_index=0, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params=PARAMS_MINUTES, translation_key="operating_minutes", entity_category=EntityCategory.DIAGNOSTIC, exclude_types=EXCL_SOFTENER_DATA),
+    RestItem( address_read="2500", read_bytes = 1, read_index=1, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params=PARAMS_HOURS, translation_key="operating_hours", entity_category=EntityCategory.DIAGNOSTIC, exclude_types=EXCL_SOFTENER_DATA),
+    RestItem( address_read="2500", read_bytes = 2, read_index=2, mformat=FORMATS.NUMBER, mtype=TYPES.SENSOR, device=DEVICES.SYS, params=PARAMS_DAYS, translation_key="operating_days", entity_category=EntityCategory.DIAGNOSTIC, exclude_types=EXCL_SOFTENER_DATA),
     RestItem( address_read="0E00", read_bytes = 4, read_index=0, mformat=FORMATS.TIMESTAMP, mtype=TYPES.SENSOR, device=DEVICES.SYS,params=PARAMS_INFO, translation_key="install_date", entity_category=EntityCategory.DIAGNOSTIC),
 
-    RestItem(address_write="3C00", write_bytes = 0, write_index=0, mformat=FORMATS.BUTTON, mtype=TYPES.BUTTON, device=DEVICES.SYS, params=PARAMS_CLOSE, translation_key="leakage_protection_close"),
-    RestItem(address_write="3D00", write_bytes = 0, write_index=0, mformat=FORMATS.BUTTON, mtype=TYPES.BUTTON, device=DEVICES.SYS, params=PARAMS_OPEN, translation_key="leakage_protection_open"),
-    RestItem(address_write="350000", write_bytes = 0, write_index=0, mformat=FORMATS.BUTTON, mtype=TYPES.BUTTON, device=DEVICES.SYS, params=PARAMS_REG, translation_key="start_regeneration"),
+    RestItem(address_write="3C00", write_bytes = 0, write_index=0, mformat=FORMATS.BUTTON, mtype=TYPES.BUTTON, device=DEVICES.SYS, params=PARAMS_CLOSE, translation_key="leakage_protection_close", exclude_types=EXCL_SOFTENER_CTRL),
+    RestItem(address_write="3D00", write_bytes = 0, write_index=0, mformat=FORMATS.BUTTON, mtype=TYPES.BUTTON, device=DEVICES.SYS, params=PARAMS_OPEN, translation_key="leakage_protection_open", exclude_types=EXCL_SOFTENER_CTRL),
+    RestItem(address_write="350000", write_bytes = 0, write_index=0, mformat=FORMATS.BUTTON, mtype=TYPES.BUTTON, device=DEVICES.SYS, params=PARAMS_REG, translation_key="start_regeneration", exclude_types=EXCL_SOFTENER_CTRL),
 
 #    RestItem(address_read="5600", read_bytes = 2, read_index=0,address_write="5600", write_bytes = 2, write_index=0, mformat=FORMATS.STATUS, mtype=TYPES.SELECT_NOIF, device=DEVICES.SYS, params= PARAMS_MASS_REFILL, resultlist=SALT_MASS, translation_key="salt_refill_mass"),
 ]
